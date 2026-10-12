@@ -207,35 +207,32 @@ class ToonStreamScraper:
         result = {"total_servers": len(servers), "servers": servers}
         self._set_cache(cache_key, result)
         return result
+def get_streaming_links(self, series_slug, season=1, episode=1):
+    """
+    স্লাগ, সিজন ও এপিসোড দিয়ে সরাসরি URL বানিয়ে স্ট্রিমিং লিংক বের করে।
+    সিরিজ পেজ স্ক্র্যাপ করার দরকার নেই।
+    """
+    # এপিসোড URL সরাসরি তৈরি
+    episode_url = f"{self.base_url}/episode/{series_slug}-{season}x{episode}/"
 
-    def get_streaming_links(self, series_slug, season=None, episode=None):
-        """একটি নির্দিষ্ট এপিসোডের সব স্ট্রিমিং লিংক বের করার মেইন ফাংশন।"""
-        episodes = self.get_episode_list(series_slug)
-        if not episodes:
-            return {"success": False, "error": "No episodes found"}
+    # সার্ভার লিংক বের করা
+    server_data = self.get_servers(episode_url)
 
-        target_ep = None
-        if season is not None and episode is not None:
-            for ep in episodes:
-                if ep["season"] == season and ep["episode"] == episode:
-                    target_ep = ep
-                    break
-        else:
-            target_ep = episodes[0]
-
-        if not target_ep:
-            return {"success": False, "error": f"Episode S{season}E{episode} not found"}
-
-        server_data = self.get_servers(target_ep["url"])
-
+    if server_data["total_servers"] == 0:
         return {
-            "success": True,
-            "data": {
-                "series_slug": series_slug,
-                "season": target_ep["season"],
-                "episode": target_ep["episode"],
-                "episode_url": target_ep["url"],
-                "total_servers": server_data["total_servers"],
-                "servers": server_data["servers"]
-            }
+            "success": False,
+            "error": f"No servers found for S{season}E{episode}. Episode may not exist.",
+            "episode_url": episode_url
         }
+
+    return {
+        "success": True,
+        "data": {
+            "series_slug": series_slug,
+            "season": season,
+            "episode": episode,
+            "episode_url": episode_url,
+            "total_servers": server_data["total_servers"],
+            "servers": server_data["servers"]
+        }
+    }
