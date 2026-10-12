@@ -1,4 +1,6 @@
 # scraper.py - ToonStream Scraper (Final Version)
+# Supports both Series and Movies URL patterns
+
 import re
 import time
 import threading
@@ -196,24 +198,37 @@ class ToonStreamScraper:
         return result
 
     def get_streaming_links(self, series_slug, season=1, episode=1):
-        episode_url = f"{self.base_url}/episode/{series_slug}-{season}x{episode}/"
-        server_data = self.get_servers(episode_url)
+        """
+        Series এবং Movie দুটো URL প্যাটার্নই ট্রাই করে।
+        যেকোনো একটি URL-এ সার্ভার পেলেই সেটি রিটার্ন করে।
+        """
+        possible_urls = [
+            f"{self.base_url}/episode/{series_slug}-{season}x{episode}/",
+            f"{self.base_url}/movies/{series_slug}/",
+            f"{self.base_url}/movie/{series_slug}/",
+            f"{self.base_url}/episode/{series_slug}-1x1/",
+            f"{self.base_url}/series/{series_slug}/",
+        ]
 
-        if server_data["total_servers"] == 0:
-            return {
-                "success": False,
-                "error": f"No servers found for S{season}E{episode}. Episode may not exist.",
-                "episode_url": episode_url
-            }
+        tried = []
+        for url in possible_urls:
+            tried.append(url)
+            server_data = self.get_servers(url)
+            if server_data["total_servers"] > 0:
+                return {
+                    "success": True,
+                    "data": {
+                        "series_slug": series_slug,
+                        "season": season,
+                        "episode": episode,
+                        "episode_url": url,
+                        "total_servers": server_data["total_servers"],
+                        "servers": server_data["servers"]
+                    }
+                }
 
         return {
-            "success": True,
-            "data": {
-                "series_slug": series_slug,
-                "season": season,
-                "episode": episode,
-                "episode_url": episode_url,
-                "total_servers": server_data["total_servers"],
-                "servers": server_data["servers"]
-            }
+            "success": False,
+            "error": f"No servers found for slug: '{series_slug}'",
+            "tried_urls": tried
         }
