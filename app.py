@@ -69,12 +69,12 @@ def streaming():
     if not slug:
         return jsonify({"success": False, "error": "Parameter 'slug' is required"}), 400
 
-    try:
-        s = int(season) if season else None
-        e = int(episode) if episode else None
-        result = scraper.get_streaming_links(slug, s, e)
-        status = 200 if result.get("success") else 404
-        return jsonify(result), status
+   try:
+    s = int(season) if season else 1
+    e = int(episode) if episode else 1
+    result = scraper.get_streaming_links(slug, s, e)
+    status = 200 if result.get("success") else 404
+    return jsonify(result), status
     except ValueError:
         return jsonify({"success": False, "error": "season and episode must be integers"}), 400
     except Exception as e:
