@@ -1,4 +1,4 @@
-# scraper.py - ToonStream Scraper (Full Version)
+# scraper.py - ToonStream Scraper (Final Version)
 import re
 import time
 import threading
@@ -15,13 +15,11 @@ class ToonStreamScraper:
         self.scraper = cloudscraper.create_scraper()
         self.scraper.headers.update(HEADERS)
         self.base_url = BASE_URL
-        # Caching সিস্টেম
         self._cache = {}
         self._cache_lock = threading.Lock()
-        self._cache_ttl = 1800  # ৩০ মিনিট
+        self._cache_ttl = 1800
 
     def _get_cache(self, key):
-        """ক্যাশ থেকে ডেটা বের করা।"""
         with self._cache_lock:
             if key in self._cache:
                 data, timestamp = self._cache[key]
@@ -32,12 +30,10 @@ class ToonStreamScraper:
         return None
 
     def _set_cache(self, key, data):
-        """ক্যাশে ডেটা সেভ করা।"""
         with self._cache_lock:
             self._cache[key] = (data, time.time())
 
     def _get_page(self, url):
-        """একটি পেজ ডাউনলোড করে BeautifulSoup অবজেক্ট রিটার্ন করে।"""
         for attempt in range(MAX_RETRIES):
             try:
                 response = self.scraper.get(url, timeout=REQUEST_TIMEOUT)
@@ -50,7 +46,6 @@ class ToonStreamScraper:
         return None
 
     def search_anime(self, query):
-        """টাইটেল বা কীওয়ার্ড দিয়ে অ্যানিমে খোঁজে।"""
         cache_key = f"search:{query.lower()}"
         cached = self._get_cache(cache_key)
         if cached is not None:
@@ -80,7 +75,6 @@ class ToonStreamScraper:
                 "url": f"{self.base_url}{href}"
             })
 
-        # ডুপ্লিকেট সরানো
         seen = set()
         unique_results = []
         for r in results:
@@ -92,7 +86,6 @@ class ToonStreamScraper:
         return unique_results
 
     def find_best_match(self, query, target_slug=None):
-        """সার্চ রেজাল্ট থেকে সবচেয়ে ভালো ম্যাচ খুঁজে বের করে।"""
         results = self.search_anime(query)
         if not results:
             return None
@@ -110,7 +103,6 @@ class ToonStreamScraper:
         return results[0]
 
     def get_episode_list(self, series_slug):
-        """একটি সিরিজের সব এপিসোডের লিস্ট বের করে।"""
         cache_key = f"episodes:{series_slug}"
         cached = self._get_cache(cache_key)
         if cached is not None:
@@ -135,7 +127,6 @@ class ToonStreamScraper:
 
             season = int(match.group(1))
             episode = int(match.group(2))
-
             full_url = href if href.startswith("http") else f"{self.base_url}{href}"
 
             episodes.append({
@@ -144,7 +135,6 @@ class ToonStreamScraper:
                 "url": full_url
             })
 
-        # ডুপ্লিকেট সরানো ও সাজানো
         seen = set()
         unique_eps = []
         for ep in episodes:
@@ -158,7 +148,6 @@ class ToonStreamScraper:
         return unique_eps
 
     def get_servers(self, episode_url):
-        """একটি এপিসোড পেজ থেকে সব সার্ভারের iframe URL ডাইনামিকভাবে বের করে।"""
         cache_key = f"servers:{episode_url}"
         cached = self._get_cache(cache_key)
         if cached is not None:
@@ -171,7 +160,6 @@ class ToonStreamScraper:
         servers = []
         seen_urls = set()
 
-        # পদ্ধতি ১: iframe ট্যাগ থেকে data-src বের করা
         iframes = soup.select("iframe")
         for idx, iframe in enumerate(iframes):
             embed_url = iframe.get("data-src") or iframe.get("src")
@@ -189,7 +177,6 @@ class ToonStreamScraper:
                 "embed_url": embed_url
             })
 
-        # পদ্ধতি ২: HTML সোর্সে regex দিয়ে খোঁজা
         if not servers:
             html = str(soup)
             data_src_matches = re.findall(r'data-src=["\']([^"\']+)["\']', html)
@@ -207,32 +194,26 @@ class ToonStreamScraper:
         result = {"total_servers": len(servers), "servers": servers}
         self._set_cache(cache_key, result)
         return result
-def get_streaming_links(self, series_slug, season=1, episode=1):
-    """
-    স্লাগ, সিজন ও এপিসোড দিয়ে সরাসরি URL বানিয়ে স্ট্রিমিং লিংক বের করে।
-    সিরিজ পেজ স্ক্র্যাপ করার দরকার নেই।
-    """
-    # এপিসোড URL সরাসরি তৈরি
-    episode_url = f"{self.base_url}/episode/{series_slug}-{season}x{episode}/"
 
-    # সার্ভার লিংক বের করা
-    server_data = self.get_servers(episode_url)
+    def get_streaming_links(self, series_slug, season=1, episode=1):
+        episode_url = f"{self.base_url}/episode/{series_slug}-{season}x{episode}/"
+        server_data = self.get_servers(episode_url)
 
-    if server_data["total_servers"] == 0:
+        if server_data["total_servers"] == 0:
+            return {
+                "success": False,
+                "error": f"No servers found for S{season}E{episode}. Episode may not exist.",
+                "episode_url": episode_url
+            }
+
         return {
-            "success": False,
-            "error": f"No servers found for S{season}E{episode}. Episode may not exist.",
-            "episode_url": episode_url
+            "success": True,
+            "data": {
+                "series_slug": series_slug,
+                "season": season,
+                "episode": episode,
+                "episode_url": episode_url,
+                "total_servers": server_data["total_servers"],
+                "servers": server_data["servers"]
+            }
         }
-
-    return {
-        "success": True,
-        "data": {
-            "series_slug": series_slug,
-            "season": season,
-            "episode": episode,
-            "episode_url": episode_url,
-            "total_servers": server_data["total_servers"],
-            "servers": server_data["servers"]
-        }
-    }
